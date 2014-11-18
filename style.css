@@ -53,6 +53,7 @@ body {
   padding: 5px 8px;
   border-left: 4px solid #42639F;
   background: white;
+  overflow: hidden;
 }
 
 .event:after {
