@@ -69,74 +69,57 @@
 
         var map = new Array(721);
 
-        // events = events.sort(function (a, b) {
-        //   return a.start - b.start;
-        // });
+        events.sort(function byRange(a, b) {
+          return (b.end - b.start) - (a.end - a.start);
+        });
 
-        // Create event map.
         events.forEach(function (event) {
+          // Prepare map.
           for(var i = event.start; i <= event.end; i++) {
             map[i] = map[i] || [];
             map[i].push(event);
           }
-        });
 
-        events.forEach(function (event) {
-          event.max = getMaxNeighbours(map, event);
-          event.sum = getSumOfNeighbours(map, event);
-        });
+          // Add dimension and neighbours.
+          event.dimension = getMaxNeighbours(map, event);
+          event.neighbours = getNeighbourgs(map, event);
 
-
-        function computeWidth() {
-          events.sort(function (a, b) {
-            return b.max - a.max;
-          }).forEach(function (event, index) {
-            var neighbours = getNeighbourgs(map, event);
-            var w = 1 / event.max;
-
-            if (event.width && event.width < w) w = event.width;
-
-            neighbours.forEach(function (event) {
-              if (!event.width || event.width > w) event.width = w;
-            });
-
-            event.neighbours = neighbours;
-            event.index = index;
+          // Sort neighbours.
+          event.neighbours.sort(function (a, b) {
+            return (a.position || 0) - (b.position || 0);
           });
-        }
 
-        computeWidth();
-
-
-        events = events.sort(function (a, b) {
-          return (b.end - b.start) - (a.end - a.start);
-        });
-
-        // events = events.sort(function (a, b) {
-        //   return b.sum - a.sum;
-        // });
-
-        events.forEach(function (event, index) {
-          event.left = event.neighbours.sort(function (a, b) {
-            return (a.left || 0) - (b.left || 0);
-          }).reduce(function (left, neigbour) {
-            if (neigbour.left === left)
-              left += neigbour.width;
-            return left;
+          event.position = event.neighbours.reduce(function (position, neigbour) {
+            if (neigbour.position === position) position++;
+            return position;
           }, 0);
 
-          if (event.left + event.width > 1) {
-            event.max ++;
-            redraw = true;
+          if (event.position >= event.dimension) {
+            event.dimension ++;
           }
         });
+
+        synchronizeDimensions();
+
+        function synchronizeDimensions() {
+          events.forEach(synchronizeDimension);
+        }
+
+        function synchronizeDimension(event) {
+          event.neighbours.forEach(function (neigbour) {
+              if (neigbour.dimension < event.dimension) {
+                neigbour.dimension = event.dimension;
+                synchronizeDimension(neigbour);
+              }
+            });
+        }
 
         // Add each event to the calendar.
         events.forEach(createEvent);
 
         function createEvent(event, index) {
-          var w = maxWidth * event.width - 22;
-          var l = maxWidth * event.left;
+          var w = maxWidth * (1 / event.dimension) - 22;
+          var l = maxWidth * (event.position / event.dimension);
 
           var element = $(eventTemplate);
           element.find('.title').html(index);
@@ -159,12 +142,6 @@
             return ar ? ar.length : 0;
           }));
         }
-
-        function getSumOfNeighbours(map, event) {
-          return map.slice(event.start, event.end).reduce(function (sum, ar) {
-            return (ar ? ar.length : 0) + sum;
-          }, 0);
-        }
       }
     }());
 
@@ -176,7 +153,7 @@
         events.push(event);
       }
 
-      console.log('SET OF EVENTS', JSON.stringify(events));
+      // console.log('SET OF EVENTS', JSON.stringify(events));
       layOutDay(events);
 
     });
