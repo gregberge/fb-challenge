@@ -38,6 +38,8 @@
 
   <div class="calendar">
   </div>
+  <input type="number" id="num" value="15">
+  <button id="generate">Generate</button>
 
   <script type="text/html" id="event-template">
     <div class="event">
@@ -54,16 +56,22 @@
       var eventTemplate = $('#event-template').html();
       var calendar = $('.calendar');
       var maxWidth = 600;
+      var elements = [];
 
       function layOutDay(events) {
+        elements.forEach(function (element) {
+          element.remove();
+        });
+        elements = [];
+
         // Do nothing if it's not a valid array.
         if (!Array.isArray(events)) return;
 
         var map = new Array(721);
 
-        events = events.sort(function (a, b) {
-          return a.start - b.start;
-        });
+        // events = events.sort(function (a, b) {
+        //   return a.start - b.start;
+        // });
 
         // Create event map.
         events.forEach(function (event) {
@@ -73,26 +81,54 @@
           }
         });
 
-        events.forEach(function (event, index) {
-          var max = getMaxNeighbourgs(map, event);
-          var neighbours = getNeighbourgs(map, event);
-          var w = 1 / max;
+        events.forEach(function (event) {
+          event.max = getMaxNeighbours(map, event);
+          event.sum = getSumOfNeighbours(map, event);
+        });
 
-          neighbours.forEach(function (event) {
-            if (!event.width) event.width = w;
-            else if (event.width > w) event.width = w;
+
+        function computeWidth() {
+          events.sort(function (a, b) {
+            return b.max - a.max;
+          }).forEach(function (event, index) {
+            var neighbours = getNeighbourgs(map, event);
+            var w = 1 / event.max;
+
+            if (event.width && event.width < w) w = event.width;
+
+            neighbours.forEach(function (event) {
+              if (!event.width || event.width > w) event.width = w;
+            });
+
+            event.neighbours = neighbours;
+            event.index = index;
           });
+        }
 
-          event.neighbours = neighbours;
-          event.index = index;
+        computeWidth();
 
-          event.left = neighbours.sort(function (a, b) {
+
+        events = events.sort(function (a, b) {
+          return (b.end - b.start) - (a.end - a.start);
+        });
+
+        // events = events.sort(function (a, b) {
+        //   return b.sum - a.sum;
+        // });
+
+        events.forEach(function (event, index) {
+          event.left = event.neighbours.sort(function (a, b) {
             return (a.left || 0) - (b.left || 0);
           }).reduce(function (left, neigbour) {
             if (neigbour.left === left)
               left += neigbour.width;
             return left;
           }, 0);
+
+          if (event.left + event.width > 1) {
+            event.max ++;
+            redraw = true;
+          }
         });
 
         // Add each event to the calendar.
@@ -109,28 +145,54 @@
           element.css('width', w);
           element.css('margin-left', l);
           calendar.append(element);
+          elements.push(element);
         }
 
         function getNeighbourgs(map, event) {
-          // var maxScore = getMaxNeighbourgs(map, event);
-          var neighbours = [];
-          var ar = map.slice(event.start, event.end);
-          ar.forEach(function (events) {
-            events.forEach(function (event) {
-              if (neighbours.indexOf(event) === -1)
-                neighbours.push(event);
-            });
+          return events.filter(function (ev) {
+            return intersects(ev, event);
           });
-          return neighbours;
         }
 
-        function getMaxNeighbourgs(map, event) {
+        function getMaxNeighbours(map, event) {
           return Math.max.apply(null, map.slice(event.start, event.end).map(function (ar) {
             return ar ? ar.length : 0;
           }));
         }
+
+        function getSumOfNeighbours(map, event) {
+          return map.slice(event.start, event.end).reduce(function (sum, ar) {
+            return (ar ? ar.length : 0) + sum;
+          }, 0);
+        }
       }
     }());
+
+    $('#generate').on('click', function () {
+      var events = [];
+      for(var i = 0; i < +$('#num').val(); i++) {
+        var event = {start: random(0, 690)};
+        event.end = random(event.start + 20, 720);
+        events.push(event);
+      }
+
+      console.log('SET OF EVENTS', JSON.stringify(events));
+      layOutDay(events);
+
+    });
+
+    function intersects(a, b) {
+      return !((a.end < b.start) || (b.end < a.start));
+     }
+
+    function random(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    layOutDay( [{"start":401,"end":496},{"start":77,"end":260},{"start":640,"end":703},{"start":201,"end":496},{"start":303,"end":579},{"start":436,"end":597},{"start":311,"end":638},{"start":500,"end":641},{"start":445,"end":680},{"start":271,"end":318},{"start":343,"end":450},{"start":274,"end":296},{"start":349,"end":444},{"start":307,"end":624},{"start":312,"end":422}]    );
+
+    layOutDay([{"start":271,"end":326},{"start":105,"end":309},{"start":115,"end":437},{"start":587,"end":657},{"start":251,"end":406},{"start":402,"end":640},{"start":77,"end":517},{"start":157,"end":710},{"start":363,"end":427},{"start":129,"end":508},{"start":557,"end":588},{"start":51,"end":389},{"start":336,"end":718},{"start":413,"end":684},{"start":567,"end":671}] );
+    // layOutDay([{"start":201,"end":478},{"start":505,"end":611},{"start":328,"end":561},{"start":92,"end":464},{"start":26,"end":370},{"start":372,"end":442},{"start":531,"end":690},{"start":461,"end":622},{"start":223,"end":399},{"start":376,"end":441},{"start":455,"end":602},{"start":486,"end":617},{"start":487,"end":720},{"start":630,"end":667},{"start":93,"end":275}] );
 
     // layOutDay([{start: 30, end: 150}, {start: 540, end: 600},  {start: 540, end: 600}, {start: 540, end: 600}, {start: 540, end: 600}, {start: 560, end: 600}, {start: 560, end: 620}, {start: 560, end: 620}, {start: 10, end: 670}, {start: 610, end: 670}, {start: 610, end: 670}]);
 
