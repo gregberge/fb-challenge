@@ -59,19 +59,18 @@
         // Do nothing if it's not a valid array.
         if (!Array.isArray(events)) return;
 
-        var scores = new Array(721);
+        var map = new Array(721);
 
+        events = events.sort(function (a, b) {
+          return a.start - b.start;
+        });
+
+        // Create event map.
         events.forEach(function (event, index) {
-          // Increment score table.
           for(var i = event.start; i <= event.end; i++) {
-            scores[i] = scores[i] || [];
-            scores[i].push(event);
+            map[i] = map[i] || [];
+            map[i].push(event);
           }
-
-          // var lastPosition = events[index - 1] ? events[index - 1].position : 1;
-          // var currentPosition = getMaxScore(scores, event);
-          // event.position = lastPosition >= currentPosition ? 1 : currentPosition;
-          // event.position = getMaxScore(scores, event);
         });
 
         // Add each event to the calendar.
@@ -80,46 +79,70 @@
         function createEvent(event, index) {
           var previousEvent = events[index - 1];
 
+          event.index = index;
+
           // Compute element neighbours.
-          event.neighbours = getMaxScore(scores, event);
+          event.neighbours = getNeighbourgs(map, event);
 
           // Compute position.
-          if (!previousEvent)
-            event.position = 0;
-          else if (!intersects(event, previousEvent))
-            event.position = 0;
-          else if (1 / previousEvent.width === previousEvent.position + 1)
-            event.position = 0;
+          // event.position = event.neighbours.indexOf(event);
+
+          var usedNeighbourgs = event.neighbours.filter(function (event) {
+            return event.width;
+          });
+
+          var lastNeigbourg = usedNeighbourgs[usedNeighbourgs.length - 1];
+
+          if (!lastNeigbourg) {
+            event.left = 0;
+            event.right = 0;
+          }
           else {
-            event.position = previousEvent.position + 1;
+            event.left = (lastNeigbourg.left + lastNeigbourg.width);
+            event.right = lastNeigbourg.right;
           }
 
-          // Compute width.
-          if (!previousEvent)
-            event.width = 1 / event.neighbours; // Last event...
-          else if (!intersects(event, previousEvent))
-            event.width = 1 / event.neighbours; // Last event...
-          else if (previousEvent.position < event.position)
-            event.width = previousEvent.width;
-          else {
-            var collidingEvents = getCollidingEvents(scores, event);
-            var usedEvents = collidingEvents.filter(function (event) {
-              return event.width;
-            });
-            var alreadyUsedWidth = usedEvents.reduce(function (sum, event) {
-              return sum + event.width;
+          if (event.left >= 1) {
+            event.right = 0;
+            event.left = event.left % 1;
+            event.right = usedNeighbourgs.reduce(function (w, event) {
+              return w + event.width;
             }, 0);
-            event.width = (1 - alreadyUsedWidth) / (event.neighbours - usedEvents.length);
-            // event.width = lastLineLength / event.neighbours * previousEvent.width;
-            // console.log(previousEvent.position + 1);
-            // console.log(event.neighbours);
-            // // ca veut dire que en proportion
-            // var previousEventsScaled = previousEvent.neighbours - previousEvent.position - 1;
-            // var eventsToScale = event.neighbours - previousEventsScaled;
-            // // console.log(previousEventsScaled, eventsToScale);
-            // // event.width = 1 / event.neighbours;
-            // event.width = (1 - previousEventsScaled * previousEvent.width) / eventsToScale;
           }
+
+          event.width = (1 - event.left - event.right) / (getMaxNeighbourgs(map, event) - usedNeighbourgs.length);
+
+
+
+
+          // // Compute width.
+          // if (!previousEvent)
+          //   event.width = 1 / event.neighbours.length; // Last event...
+          // else if (!intersects(event, previousEvent))
+          //   event.width = 1 / event.neighbours.length; // Last event...
+          // // else if (previousEvent.position < event.position)
+          // //   event.width = previousEvent.width;
+          // else {
+          //   var usedNeighbourgs = event.neighbours.filter(function (event) {
+          //     return event.width;
+          //   });
+          //   var alreadyUsedWidth = usedNeighbourgs.reduce(function (sum, event) {
+          //     return sum + event.width;
+          //   }, 0);
+          //   event.width = (1 - alreadyUsedWidth) / (event.neighbours.length - usedNeighbourgs.length);
+          //   event.left = alreadyUsedWidth;
+          //   // event.width = lastLineLength / event.neighbours * previousEvent.width;
+          //   // console.log(previousEvent.position + 1);
+          //   // console.log(event.neighbours);
+          //   // // ca veut dire que en proportion
+          //   // var previousEventsScaled = previousEvent.neighbours - previousEvent.position - 1;
+          //   // var eventsToScale = event.neighbours - previousEventsScaled;
+          //   // // console.log(previousEventsScaled, eventsToScale);
+          //   // // event.width = 1 / event.neighbours;
+          //   // event.width = (1 - previousEventsScaled * previousEvent.width) / eventsToScale;
+          // }
+
+          console.log(index, event);
 
           // console.log(event);
 
@@ -131,12 +154,13 @@
           //   event.width = previousEvent.position + 1 - event.neighbours;
 
           var w = maxWidth * event.width - 22;
-          var l = (w + 22) * event.position;
+          var l = maxWidth * event.left;
 
           // var lastEvent = getLastEvent(events, index);
-          // var w = maxWidth / getMaxScore(scores, {start: event.start, end: lastEvent.end}) - 22;
+          // var w = maxWidth / getMaxNeighbourgs(map, {start: event.start, end: lastEvent.end}) - 22;
           // var left = (w + 22) * (event.position - 1);
           var element = $(eventTemplate);
+          element.find('.title').html(index);
           // console.log(event);
           element.css('top', event.start + 'px');
           element.css('height', (event.end - event.start - 10) + 'px');
@@ -145,16 +169,21 @@
           calendar.append(element);
         }
 
-        function getCollidingEvents(scores, event) {
-          var maxScore = getMaxScore(scores, event);
-          var ar = scores.slice(event.start, event.end);
-          return ar.filter(function (events) {
-            return events.length === maxScore;
-          })[0];
+        function getNeighbourgs(map, event) {
+          // var maxScore = getMaxNeighbourgs(map, event);
+          var neighbours = [];
+          var ar = map.slice(event.start, event.end);
+          ar.forEach(function (events) {
+            events.forEach(function (event) {
+              if (neighbours.indexOf(event) === -1)
+                neighbours.push(event);
+            });
+          });
+          return neighbours;
         }
 
-        function getMaxScore(scores, event) {
-          return Math.max.apply(null, scores.slice(event.start, event.end).map(function (ar) {
+        function getMaxNeighbourgs(map, event) {
+          return Math.max.apply(null, map.slice(event.start, event.end).map(function (ar) {
             return ar ? ar.length : 0;
           }));
         }
@@ -177,7 +206,9 @@
       }
     }());
 
-    layOutDay([{start: 30, end: 150}, {start: 540, end: 600},  {start: 540, end: 600}, {start: 540, end: 600}, {start: 540, end: 600}, {start: 560, end: 620}, {start: 560, end: 620}, {start: 560, end: 620}, {start: 10, end: 620}, {start: 610, end: 670}, {start: 610, end: 670}, {start: 610, end: 670}, {start: 610, end: 670}, {start: 610, end: 670}, {start: 610, end: 670}]);
+    layOutDay([{start: 30, end: 150}, {start: 540, end: 600},  {start: 540, end: 600}, {start: 540, end: 600}, {start: 540, end: 600}, {start: 560, end: 620}, {start: 560, end: 620}, {start: 560, end: 620}, {start: 10, end: 670}, {start: 610, end: 670}, {start: 610, end: 670}]);
+
+    // layOutDay([{start: 30, end: 150}, {start: 540, end: 600}, {start: 560, end: 620}, {start: 610, end: 670}]);
   </script>
 </body>
 </html>
