@@ -16,6 +16,10 @@ gulp.task('default', ['browser-sync'], function () {
     browserSync.reload(['style.css']);
   });
 
+  gulp.watch('*.js', function () {
+    browserSync.reload();
+  });
+
   gulp.watch('index.html', function () {
     browserSync.reload(['index.html']);
   });
