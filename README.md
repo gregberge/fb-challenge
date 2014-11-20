@@ -6,7 +6,6 @@ Facebook Challenge.
 
 ```
 npm install
-bower install
 gulp
 ```
 
