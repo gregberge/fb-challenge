@@ -1,4 +1,4 @@
-(function () {
+(function (undefined) {
   // Expose method on global scope.
   window.layOutDay = layOutDay;
 
@@ -24,6 +24,13 @@
     // Do nothing if it's not a valid array.
     if (!Array.isArray(events)) return;
 
+    // Remove invalid events.
+    events = events.filter(function isValid(event) {
+      return event.start !== undefined &&
+        event.end !== undefined &&
+        event.end > event.start;
+    });
+
     // Sort events by range to optimize positioning.
     events.sort(function byRange(a, b) {
       return (b.end - b.start) - (a.end - a.start);
@@ -33,7 +40,7 @@
     events.forEach(function computeDimensionAndPosition(event) {
       // Add dimension and neighbours.
       event.dimension = 0;
-      event.neighbours = getNeighbourgs(event);
+      event.neighbours = getNeighbours(event);
 
       // Compute position of the event.
       event.position = event.neighbours.reduce(function (position, neigbour) {
@@ -51,7 +58,7 @@
       return b.dimension - a.dimension;
     });
 
-    // Propagate event dimension to neighbourgs.
+    // Propagate event dimension to neighbours.
     events.forEach(function propagateDimension(event) {
       event.neighbours.forEach(function (neigbour) {
         if (neigbour.dimension < event.dimension) {
@@ -82,12 +89,12 @@
 
     /**
      * Return neighbours of an event.
-     * Neigbourgs are events that interesects.
+     * Neigbours are events that interesects.
      *
      * @param {object} event
      */
 
-    function getNeighbourgs(event) {
+    function getNeighbours(event) {
       return events.filter(function (ev) {
         return intersects(ev, event);
       })
@@ -108,7 +115,7 @@
     }
 
     /**
-     * Clean the calendar by removin all elements.
+     * Clean the calendar by removing all elements.
      */
 
     function clean() {
